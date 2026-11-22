@@ -2,7 +2,7 @@
 
 **A governed harness for Claude Code. Claude proposes, you approve.**
 
-Context engineering, structured skills and PHI safeguards take each ticket from specification to review, with human approval at every checkpoint.
+Context engineering, structured skills and safeguards for sensitive data take each ticket from specification to review, with human approval at every checkpoint.
 
 Created by Dipen Patel.
 
