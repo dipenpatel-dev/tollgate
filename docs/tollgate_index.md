@@ -170,7 +170,7 @@ One entry per documented source file (page path under `docs/` mirrors the source
 - [scripts/search/refstore.py](scripts/search/refstore.md) - Small shared helpers for the reference store, so that the tool that adds documents and the tool that searches them agree on three things: where the re
 - [scripts/search/router.py](scripts/search/router.md) - The search engine core.
 - [scripts/search/routing.yaml](scripts/search/routing.md) - The tuning file for the search router.
-- [scripts/search/tg-search](scripts/search/tg-search.md) - `tg-search` is one fixed command that fronts four Python search tools (query, ground, reference, health).
+- [scripts/search/tg-search](scripts/search/tg-search.md) - `tg-search` is one fixed command that fronts five Python search tools (query, ground, reference, add, health).
 - [scripts/search/vault_health.py](scripts/search/vault_health.md) - A health check for the notes vault and its search index.
 - [scripts/state/backfill_session_logs.py](scripts/state/backfill_session_logs.md) - A one-time clean-up tool.
 - [scripts/state/backfill_vault_frontmatter.py](scripts/state/backfill_vault_frontmatter.md) - A one-shot maintenance tool that labels vault markdown files with four retrieval fields (`catalog_type`, `doc_role`, `indexable`, `indexed`) by insert
