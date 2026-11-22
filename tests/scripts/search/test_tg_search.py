@@ -21,7 +21,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 WRAPPER = ROOT / "scripts" / "search" / "tg-search"
 SEARCH = ROOT / "scripts" / "search"
 TOOLS = {"query": "query_index.py", "ground": "ground.py",
-         "reference": "reference_query.py", "health": "vault_health.py"}
+         "reference": "reference_query.py", "add": "reference_add.py", "health": "vault_health.py"}
 
 FAKE_PY = """#!/bin/sh
 { echo "SCRIPT=$1"; shift; for a in "$@"; do echo "ARG=$a"; done; echo "STDIN=$(cat)"; } > "$FAKE_OUT"
