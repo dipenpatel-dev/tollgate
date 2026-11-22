@@ -155,7 +155,7 @@ class ReferenceStore(unittest.TestCase):
 
     def test_tag_filter_finds_a_library_file_once(self):
         lib = self.make_library()
-        run_script("reference_add.py", [str(lib), "--tag", "design"], self.env)
+        self.assertEqual(run_script("reference_add.py", [str(lib), "--tag", "design"], self.env).returncode, 0)
         write(pathlib.Path(self.home) / ".tollgate" / "references.yaml", "arch_design: [design]\n")
         import build_index
         with in_env(self.env):
@@ -179,6 +179,37 @@ class ReferenceStore(unittest.TestCase):
         write(path, "a: [x, y]\nb: z   # note\n# c: [skipped]\nd: []\n")
         self.assertEqual(refstore.load_situation_tags(path), {"a": ["x", "y"], "b": ["z"]})
         self.assertEqual(refstore.load_situation_tags(pathlib.Path(self.home) / "none.yaml"), {})
+
+    def test_a_path_with_dots_gets_the_same_key_as_the_rebuild(self):
+        # TG-1: references/design/../design/seams.md must be stored as references/design/seams.md.
+        import build_index
+        lib = self.make_library()
+        with in_env(self.env):
+            build_index.build(embedder_name="hash")
+        odd = str(lib / "design" / ".." / "design")
+        self.assertEqual(run_script("reference_add.py", [odd, "--tag", "design"], self.env).returncode, 0)
+        seams = self.library_chunks("seams.md")
+        self.assertEqual({m["origin"] for m in seams}, {"add"})
+        self.assertEqual({m["file"] for m in seams}, {"references/design/seams.md"})
+
+    def test_an_edit_to_an_added_file_reaches_the_index_when_it_is_added_again(self):
+        # The rebuild leaves added files alone, so an edit is picked up only by adding the file again.
+        import build_index
+        lib = self.make_library()
+        design = lib / "design"
+        self.assertEqual(run_script("reference_add.py", [str(design), "--tag", "design"], self.env).returncode, 0)
+        write(design / "seams.md", "# Seams\n\nA brand new paragraph about orchard ladders, which are tall and narrow and lean on the tree trunk.\n")
+        with in_env(self.env):
+            build_index.build(embedder_name="hash")
+        self.assertNotIn("orchard", " ".join(self._texts("seams.md")))
+        self.assertEqual(run_script("reference_add.py", [str(design), "--tag", "design"], self.env).returncode, 0)
+        self.assertIn("orchard", " ".join(self._texts("seams.md")))
+
+    def _texts(self, name_part):
+        import refstore
+        with in_env(self.env):
+            got = refstore.open_references().get(include=["documents", "metadatas"])
+        return [d for d, m in zip(got["documents"], got["metadatas"]) if name_part in m["file"]]
 
 
 if __name__ == "__main__":

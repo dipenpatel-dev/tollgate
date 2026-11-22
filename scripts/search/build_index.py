@@ -13,7 +13,7 @@ change_log:
   1.2.0: The vault walk skips the top-level archive, work, history, landing and output folders (by path, from the
          layout). Files that are links pointing outside their source folder are skipped. Stale entries are
          removed per collection, so one unreadable file no longer leaves ghost entries.
-  1.3.0: TG-1. A file in the references folder that reference_add.py added with tags is skipped by the build,
+  1.3.0: TG-1. A file in the references folder that reference_add.py added (with or without tags) is skipped by the build,
          and its untagged build chunks are removed, so a passage is never stored twice. Edits to such a file
          reach the index when it is added again. reference_key() gives the key both scripts use for it.
 usage: python3 build_index.py [--full] [--source vault|tickets|references|code|standards] [--embedder hash|local|auto] [--context]
@@ -317,7 +317,7 @@ def reference_key(path: pathlib.Path) -> str | None:
         if collection != "references" or not real_inside(path, root):
             continue
         for base in (root, root.resolve()):
-            for candidate in (path.absolute(), path.resolve()):
+            for candidate in (pathlib.Path(os.path.abspath(path)), path.resolve()):
                 try:
                     rel = candidate.relative_to(base).as_posix()
                 except ValueError:
@@ -480,7 +480,7 @@ def build(only: str | None = None, full: bool = False, embedder_name: str | None
     if not only or embedder_mod.read_marker(root) is None:
         embedder_mod.write_marker(root, emb)
 
-    # Files added with tags (origin add) belong to reference_add.py. The build leaves them alone.
+    # Files added with reference_add.py (origin add, tagged or not) belong to it. The build leaves them alone.
     added_keys: set[str] = set()
     if "references" in registry:
         got = registry["references"][0].get(where={"origin": "add"}, include=["metadatas"])
