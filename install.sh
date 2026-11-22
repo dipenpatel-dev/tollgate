@@ -189,7 +189,7 @@ if [ "$RESTORE_SETTINGS" = 1 ]; then
 fi
 
 # Standard skills list (used in migration analysis and custom-skill detection)
-STANDARD_SKILLS="tg-arch tg-close tg-dev tg-devops tg-doc-gen tg-draft tg-explain tg-explore tg-handoff tg-influence tg-learn tg-pr-review tg-pull-notes tg-qa tg-retrieve tg-save tg-spec tg-sre tg-start tg-status tg-support tg-sweep tg-sync tg-terraform tg-think-calibrate tg-ticket tg-weekly tg-whiteboard"
+STANDARD_SKILLS="tg-arch tg-close tg-dev tg-devops tg-doc-gen tg-draft tg-explain tg-explore tg-handoff tg-influence tg-learn tg-pr-review tg-pull-notes tg-qa tg-reference-import tg-retrieve tg-save tg-spec tg-sre tg-start tg-status tg-support tg-sweep tg-sync tg-terraform tg-think-calibrate tg-ticket tg-weekly tg-whiteboard"
 
 # ── Formatting ────────────────────────────────────────────────────────────────
 BOLD='\033[1m'; RESET='\033[0m'; GREEN='\033[0;32m'

@@ -118,12 +118,12 @@ Setup notes: `git-commits` reads local git history and needs no key. The framewo
 
 ## Reference store
 
-The reference store is the user's own searchable library of documents (books, papers, standards, notes, anything). Tollgate ships none. The user decides what goes in and which vector store holds it.
+The reference store is the user's own searchable library of documents (books, papers, standards, notes, anything). Tollgate ships none. The user decides what goes in and which vector store holds it. The command `/tg-reference-import` is the normal way in: it copies the material into the `references` folder, writes a README and an index there, adds the files to the store with the user's tags, and writes the situation lines in `references.yaml`.
 
 | Item | Rule |
 |---|---|
 | Logical names in the paths file (`TOLLGATE_PATHS`) | `references` (folder of source documents; the installer points it at the `-library` folder beside the vault, only when the paths file has no `references:` line yet), `index` (where the vector store lives), `standards` (optional folder of standards notes; no default, unset means off). All are read through `scripts/core`. |
-| `scripts/search/reference_add.py` | Adds a file or folder to the store. The user chooses tags, for example `design`, `security`. |
+| `scripts/search/reference_add.py` | Adds a file or folder to the store. The user chooses tags, for example `design`, `security`. Commands call it only through `tg-search add`. A file inside the `references` folder gets the same key the rebuild uses, so the rebuild skips it and a passage is never stored twice. |
 | `scripts/search/reference_query.py` | Flags `--situation --stakes --skill --query --top`. Returns passages with source and tag. The situation names a command asks for (for example `spec_define`, `arch_design`, `dev_implement`, `qa_review`) are mapped to the user's tags in the user's own file `references.yaml` next to the paths file. Empty by default. |
 | No setup | With no store, or no match, it prints `not set up` or `no match`, exits 0 for no match and non-zero for not set up, makes no network call, and the calling command continues. |
 | Names | No book, author or personal file is named anywhere in the repo. |

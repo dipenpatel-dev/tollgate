@@ -86,7 +86,7 @@ tollgate-knowledge/                   your Obsidian vault ($TOLLGATE_KNOWLEDGE)
 │                                    and env are kept, only Tollgate's entries are replaced
 │                                    settings.local.json (machine specific) is in .gitignore
 │
-├── commands/                     ← the 28 commands, shipped with their final names
+├── commands/                     ← the 29 commands, shipped with their final names
 │   │                                install.sh copies these to ~/.claude/commands/
 │   │                                under the same name, with your name and company filled in,
 │   │                                and every $TOLLGATE_HOME/ script call rewritten to the
@@ -115,6 +115,7 @@ tollgate-knowledge/                   your Obsidian vault ($TOLLGATE_KNOWLEDGE)
 │   ├── tg-handoff.md             ← /tg-handoff      write the next chain skill's starter prompt
 │   │                                                into the ticket state file
 │   ├── tg-explain.md             ← /tg-explain      what was built
+│   ├── tg-reference-import.md    ← /tg-reference-import  add reference material to the library and the search
 │   ├── tg-retrieve.md            ← /tg-retrieve     grounded passages from the search index
 │   ├── tg-sweep.md               ← /tg-sweep        flush knowledge staging to vault and index
 │   ├── tg-doc-gen.md             ← /tg-doc-gen      code documentation generator
@@ -299,7 +300,7 @@ Two requirements apply to the code folders above. The hooks and the settings mer
 │   ├── tg-start.md
 │   ├── tg-close.md
 │   ├── tg-draft.md
-│   ├── ...                       ← 28 tg-*.md files in all
+│   ├── ...                       ← 29 tg-*.md files in all
 │   └── my-own-command.md         ← your own command files are never touched
 │
 └── projects/

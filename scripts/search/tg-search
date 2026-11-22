@@ -2,11 +2,12 @@
 # File: tg-search
 # Author: Dipen Patel (dipenpatel-dev)
 # Date:
-# Scope: One fixed command for the four search tools, so one permission rule covers them all.
-# Usage: tg-search <query|ground|reference|health> [args...]
+# Scope: One fixed command for the five search tools, so one permission rule covers them all.
+# Usage: tg-search <query|ground|reference|add|health> [args...]
 #   query      scripts/search/query_index.py
 #   ground     scripts/search/ground.py
 #   reference  scripts/search/reference_query.py
+#   add        scripts/search/reference_add.py
 #   health     scripts/search/vault_health.py
 #   Arguments and stdin go to the tool unchanged; its exit code is the exit code of tg-search.
 #   Python: $TOLLGATE_PYTHON if it is set and executable, else the venv that scripts/core/setup_venv.sh
@@ -14,20 +15,22 @@
 #   An unknown tool prints the usage on stderr and exits 2.
 # ChangeLog:
 #   Created.
+#   Added the add tool (TG-1), so a command can add reference files without a separate permission rule.
 
 set -u
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
-    echo "usage: tg-search <query|ground|reference|health> [args...]" >&2
+    echo "usage: tg-search <query|ground|reference|add|health> [args...]" >&2
 }
 
 case "${1:-}" in
     query)     SCRIPT="query_index.py" ;;
     ground)    SCRIPT="ground.py" ;;
     reference) SCRIPT="reference_query.py" ;;
-    health)    SCRIPT="vault_health.py" ;;
+    add)       SCRIPT="reference_add.py" ;;
+    health)   SCRIPT="vault_health.py" ;;
     *)
         [ -n "${1:-}" ] && echo "tg-search: unknown tool: $1" >&2
         usage
