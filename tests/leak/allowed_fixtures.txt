@@ -1,0 +1,27 @@
+# Files the leak scanner skips, by name. One entry per line.
+#   name_or_relative_path            skip for every rule
+#   name_or_relative_path : LEK-02   skip for the listed rules only
+# A name with no '/' matches the base name anywhere in the tree.
+# These hold the rules or synthetic test data, so they must not self-flag.
+scan_leaks.py
+test_leak.py
+allowed_fixtures.txt
+# Rule text and fake test data, by relative path and by rule.
+hooks/co_authored_by_check.sh : LEK-03
+docs/hooks/co_authored_by_check.md : LEK-03
+docs/hooks.md : LEK-03
+docs/tests/leak.md : LEK-03
+docs/settings.md : LEK-03
+docs/structure.md : LEK-03
+docs/tests/hooks/test_security_fixes.md : LEK-03
+docs/tools/port/port.md : LEK-03
+docs/tools/port/tests/test_port.md : LEK-02
+docs/hooks/pre-submit-vault-inject.md : LEK-02
+docs/tests/scripts/sync/test_sync_vault_scan.md : LEK-02
+tools/port/port.py : LEK-03
+tools/port/tests/test_port.py : LEK-02, LEK-03
+tests/hooks/e2e-wiring-checklist.md : LEK-03
+tests/hooks/test_gate_rules.py : LEK-03
+tests/hooks/fixtures/post-tool-bash-scan-secrets/tc-02-anthropic-key.json : LEK-03
+tests/hooks/test_security_fixes.py : LEK-02
+tests/scripts/sync/test_sync_vault_scan.py : LEK-02

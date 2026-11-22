@@ -1,0 +1,30 @@
+{
+  "workspace_slug": "your-workspace-slug",
+  "new_ticket_board_status": "Backlog",
+  "external_source_name": "tollgate",
+  "prefix_table": {
+    "T": {"project_key": "T", "number_width": 3}
+  },
+  "status_map": {
+    "BACKLOG": "Backlog",
+    "ROUTED": "Backlog",
+    "SPEC_APPROVED": "Ready",
+    "DESIGN_COMPLETE": "Ready",
+    "DESIGN_APPROVED": "Ready",
+    "IN_DEV": "In progress",
+    "DEV_COMPLETE": "Review",
+    "QA_BLOCKED": "Waiting",
+    "QA_APPROVED": "Review",
+    "SUPPORT_COMPLETE": "Done",
+    "RESOLVED_TIER_1": "Done",
+    "SHIPPED": "Done",
+    "CLOSED": "Done",
+    "PARKED": "Parked",
+    "CANCELLED": "Cancelled"
+  },
+  "blocked_words": ["QA_BLOCKED"],
+  "min_seconds_between_calls": 1.2,
+  "http_timeout_seconds": 30,
+  "page_size": 100,
+  "comment_max_chars": 15000
+}

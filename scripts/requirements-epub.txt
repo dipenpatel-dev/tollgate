@@ -1,0 +1,5 @@
+# Optional: lets the search index read .epub books.
+# Kept apart because ebooklib is licensed AGPL-3. Install only if that suits you:
+#   <venv>/bin/pip install -r scripts/requirements-epub.txt
+# Without it, epub files are skipped with a log line and everything else is indexed.
+ebooklib>=0.21,<1

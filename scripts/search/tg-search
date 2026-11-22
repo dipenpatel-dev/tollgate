@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# File: tg-search
+# Author: Dipen Patel (dipenpatel-dev)
+# Date:
+# Scope: One fixed command for the four search tools, so one permission rule covers them all.
+# Usage: tg-search <query|ground|reference|health> [args...]
+#   query      scripts/search/query_index.py
+#   ground     scripts/search/ground.py
+#   reference  scripts/search/reference_query.py
+#   health     scripts/search/vault_health.py
+#   Arguments and stdin go to the tool unchanged; its exit code is the exit code of tg-search.
+#   Python: $TOLLGATE_PYTHON if it is set and executable, else the venv that scripts/core/setup_venv.sh
+#   builds (<state folder>/venv/bin/python3) if it exists, else python3.
+#   An unknown tool prints the usage on stderr and exits 2.
+# ChangeLog:
+#   Created.
+
+set -u
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+usage() {
+    echo "usage: tg-search <query|ground|reference|health> [args...]" >&2
+}
+
+case "${1:-}" in
+    query)     SCRIPT="query_index.py" ;;
+    ground)    SCRIPT="ground.py" ;;
+    reference) SCRIPT="reference_query.py" ;;
+    health)    SCRIPT="vault_health.py" ;;
+    *)
+        [ -n "${1:-}" ] && echo "tg-search: unknown tool: $1" >&2
+        usage
+        exit 2
+        ;;
+esac
+shift
+
+PY=""
+if [ -n "${TOLLGATE_PYTHON:-}" ] && [ -x "${TOLLGATE_PYTHON}" ]; then
+    PY="$TOLLGATE_PYTHON"
+else
+    STATE="$("$HERE/../core/tg_path" state 2>/dev/null)" || STATE=""
+    if [ -n "$STATE" ] && [ -x "$STATE/venv/bin/python3" ]; then
+        PY="$STATE/venv/bin/python3"
+    fi
+fi
+[ -n "$PY" ] || PY="python3"
+
+exec "$PY" "$HERE/$SCRIPT" "$@"

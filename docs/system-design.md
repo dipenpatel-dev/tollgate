@@ -1,0 +1,211 @@
+# System Design
+
+Created by Dipen Patel.
+
+---
+
+## The Core Idea
+
+This system is built on one premise: Claude works best when it has a defined role, clear standards, and a structured handoff between phases of work. Without that structure, every session starts cold, every output is inconsistent, and Claude is a general assistant rather than a specialized thinking partner.
+
+The system turns Claude into something closer to a team of department heads, each with a specific job, a defined output, and a handoff contract to the next department. You stay in the loop on every decision. Claude never acts autonomously.
+
+---
+
+## The Departments Model
+
+Each skill in the system represents a distinct role. A ticket does not move to the next role until the current one is complete.
+
+Every command carries the fixed prefix `tg-`, so the ticket skill is `/tg-ticket`. There is no per-install prefix.
+
+| Skill | Role | What it produces |
+|---|---|---|
+| `/tg-ticket` | Intake coordinator | ORIENT block, ticket classification, Jira comment draft |
+| `/tg-support` | Diagnostician | Root cause, evidence trail, fix recommendation |
+| `/tg-spec` | Product manager | Requirements, acceptance criteria, success metrics |
+| `/tg-arch` | Architect | Design options, trade offs, recommendation |
+| `/tg-dev` | Engineer | Code against an approved design, no scope drift |
+| `/tg-qa` | Adversary | Findings routed to dev, arch, or spec as appropriate |
+| `/tg-draft` | Communications lead | Every message going to another person |
+| `/tg-weekly` | Account manager | Client signal list and call talking points |
+| `/tg-learn` | Teacher | Structured learning with explain back and challenge |
+
+This is why the chain exists. You do not ask an architect to do QA. You do not ask an engineer to write the spec. Each skill is scoped to its role and exits cleanly so the next role can start.
+
+---
+
+## The Three Standards
+
+Three documents govern all output. The five chain skills (`/tg-support`, `/tg-spec`, `/tg-arch`, `/tg-dev`, `/tg-qa`) read all three at Step 0. A few other commands (`/tg-start`, `/tg-draft`, `/tg-influence`) read the voice standard only; the rest name none of them. {src:commands/tg-spec.md:12-15}
+
+**`standards/voice-standard.md`** governs every word Claude produces. Conclusion first. Bracket test (cut any word that can be removed without losing meaning). No intensifiers. Active voice. No template residue. These rules apply equally to a Jira comment and a data pipeline design.
+
+**`standards/technical-standards.md`** governs every technical artifact. Type hints on every function. Functions at or under 40 lines. No magic numbers. No secrets in code. Explicit write modes, join types, and null handling. Verify before using any method or path. These rules apply to code, SQL, schema definitions, and configs.
+
+**`standards/pipeline-standards.md`** governs pipeline architecture. Layer boundaries. Write semantics. Idempotency at every layer. Null handling explicit at every join. One pipeline YAML drives all layers. Schema lineage from source through silver. These rules exist because wrong patient data is worse than missing patient data.
+
+The chain skills read these at Step 0 before they do anything. Not midway through. Not after the fact.
+
+---
+
+## The Session Frame
+
+Every work block has the same bookends.
+
+**`/tg-start`** opens the session. It runs a checklist: vault health, surface any open blockers, yesterday's work. It reads the vault first; a tracker or chat tool is an optional connector. You see what is in progress before you pick up anything new. The session has context before it has work.
+
+**`/tg-close`** closes the session. It writes a session log to the vault, updates the ticket state file, surfaces any corrections from the session as memory candidates. Nothing is left floating.
+
+Between those bookends, skills handle specific work. State carries forward through the vault so the next session picks up exactly where this one left off.
+
+---
+
+## The Vault
+
+The vault is your personal knowledge base, backed by Obsidian. It is not optional. Skills depend on it. Git for the vault is optional: the `vault_git` setting (`none`, `local` or `remote`) chosen at install decides whether commands print vault git lines. They never run them, and `/tg-close` prints the commit text for you to run.
+
+Three things live in the vault that cannot live anywhere else:
+
+**Ticket state files** at `02-tickets/{KEY}/{KEY}-state.md`. Each skill writes to this file. The gate also finds `02-tickets/PREFIX/KEY/` (prefix matched without case). The next skill reads it. This is how a six skill chain can span multiple sessions without losing context. If a state file does not exist, the skill starts cold and must reconstruct what it would have inherited.
+
+**System map** at `01-system-map/`. Client files, pipeline files, architecture diagrams, schema knowledge, Databricks concepts. When `/tg-ticket` orients on a client ticket, it reads the client file here. When `/tg-support` traces a bug, it checks the pipeline file here. Without the system map, every investigation starts from scratch.
+
+**Decisions and learnings** at `03-knowledge-base/`. What was decided and why. What was learned and where it applies. These accumulate over time and become the organizational memory that prevents the same mistake twice.
+
+---
+
+## How State Carries Forward
+
+This is the mechanism that makes the chain work.
+
+When `/tg-ticket PROJ-200` finishes, it writes a state file:
+
+```
+02-tickets/PROJ-200/PROJ-200-state.md
+```
+
+That file contains: status, what was confirmed, what is unknown, what is assumed, and what skill runs next. When `/tg-support PROJ-200` starts, it reads this file as Step 0. It knows exactly what the ticket coordinator found. It does not read Jira from scratch. It does not ask you to recap.
+
+When `/tg-support` finishes, it updates the state file and writes a handoff document:
+
+```
+02-tickets/PROJ-200/PROJ-200-support-handoff.md
+```
+
+`/tg-spec` reads the handoff. Not the Jira ticket. The handoff.
+
+Each skill reads what the previous skill produced and writes what the next skill needs. The chain is a sequence of contracts.
+
+---
+
+## PHI Guardrails
+
+Health data rules apply to every layer of the system. No exceptions.
+
+What never appears in any skill output, vault file, commit message, log entry, or draft:
+- Patient names
+- Medical record numbers (MRNs)
+- Dates of birth
+- Encounter IDs that could identify a patient
+- Any field that uniquely identifies a person
+
+What is permitted:
+- Counts ("22 of 500 records failed the null check")
+- Aggregate statistics ("14% of encounter records have null procedure date")
+- Anonymized examples ("Record type: TAVR, field: encounter_date, value: NULL")
+- MRNs in the Evidence section of a support handoff, marked internal use only
+
+When PHI comes into scope, the skill stops and flags it. You acknowledge before the skill continues.
+
+**Automated enforcement (hook layer):**
+
+Hooks reinforce these rules at the tool level, independent of skill behavior. They work in two layers.
+
+**Blocking layer.** The action does not happen unless you approve it.
+
+- PHI scans on file writes (`pre-tool-write-scan-phi.py`) and on Bash commands and the script files they name (`pre-tool-bash-scan-phi.py`). Findings have three levels: deny blocks, ask prompts you, warn adds a message.
+- Path guards that keep writes out of the read only code folder, and an ask before reading a file on the sensitive path list.
+- A summary and your approval before any Databricks command that returns rows, and your approval before `gh pr create`.
+- Gate checks that block `/tg-arch`, `/tg-dev` and `/tg-qa` until the earlier `Status:` values in the ticket's state, spec, design and validation files are present (the gate reads `Status:` values only). They fire for a typed command and for a skill Claude calls itself.
+
+**Advisory layer.** PostToolUse hooks cannot suppress a result, so Claude receives the raw output plus a warning (`post-tool-result-scan-phi.py` for PHI, `post-tool-bash-scan-secrets.py` for credentials).
+
+Disk writes and commands cannot carry PHI past the blocking layer. Tool results that contain PHI or credentials reach Claude with a warning attached. The full list of hooks, what each does and what it does not catch is in the [Hook Reference](hooks.md).
+
+---
+
+## The Decision Framework
+
+Every nontrivial decision produces four pieces before anything is acted on:
+
+**WHAT**: what is being decided
+**HOW**: the specific approach
+**WHY**: the reasoning
+**WHY NOT**: alternatives considered and why they were rejected
+
+Presenting one option without naming the alternatives is not a decision. It is a suggestion. The framework forces Claude to show its work and gives you something to correct.
+
+The framework fires at medium and high stakes. Low stakes calls (a local edit, a formatting change, a mechanical step with one obvious path) produce a one line summary, not a full WHAT/HOW/WHY wall. The distinction matters because a wall on every small decision slows work down without adding value.
+
+---
+
+## The Two Voices
+
+Every communication is labeled as one of two voices before it is drafted.
+
+**Client voice** speaks in outcomes, not mechanisms. The reader is a clinical administrator or data contact at the client organization. They care about their data delivery timeline, whether their clinical team has what they need, and whether they need to do anything. They do not care what the pipeline does internally or what table the problem appeared in.
+
+**Internal voice** speaks technically, precisely, and directly. The reader is a data engineer or team lead. They need table names, ticket numbers, specific failure counts, and clear ownership of next steps. No softening, no over explanation.
+
+The same fact sounds different in each voice. "22 patients are missing from the TAVR report due to a null encounter date in the source file" becomes, in client voice: "Your TAVR data is complete. We resolved a source data gap and all 500 patients now appear in the clinical report." The technical fact and the client message are different things. Both are produced. You choose which one to send and when.
+
+---
+
+## Memory and the Feedback Loop
+
+When you correct Claude's approach, that correction does not evaporate at the end of the session. `/tg-close` surfaces it as a memory candidate. You approve it. It is written as a feedback file in your Claude project memory folder (`~/.claude/projects/<project>/memory/`). {src:commands/tg-close.md:186}
+
+The next session, Claude reads the memory files at startup. The correction is applied without you having to repeat it.
+
+Memory files accumulate over time into a picture of how you work, what has gone wrong, and what has been validated. They are the difference between a system that resets every session and one that compounds knowledge.
+
+---
+
+## How to Adopt This System
+
+This system was built for a data integration role in health data, working with Databricks, Delta Lake, Azure, and Unity Catalog. Most of it is universal. Some of it is specific.
+
+**What is universal and can be adopted without change:**
+
+- The voice standard (conclusion first, bracket test, two voices, no template residue)
+- The decision framework (WHAT/HOW/WHY/WHY NOT)
+- The skill chain model (each skill is one role, state carries forward through a vault)
+- The session frame (/tg-start and /tg-close bookends)
+- The memory feedback loop
+- The PHI guardrails (adapt field names to your domain's sensitive data)
+
+**What is specific to this health data integration context:**
+
+- The pipeline standards (Raw/Bronze/Silver layer rules, write semantics, Unity Catalog governance)
+- The skill implementations (they reference your Jira board, your Databricks catalog names, and your client patterns)
+- The MCP server config (Atlassian and Slack credentials)
+
+**How to adapt:**
+
+Start with the `CLAUDE.md` identity section. Fill in your role, your stack, and your domain. The behavior rules and guardrails below that section apply immediately.
+
+Add your own rules to `standards/technical-standards.md` and `standards/pipeline-standards.md`. Delete rules that do not apply. The rules are not a menu; they are a floor. Build up from it.
+
+Write your own skill files for the workflows unique to your context. The `standards/skill-standard.md` document describes the structure every skill must follow. Use it as the template. Study the existing skills before writing a new one.
+
+The voice standard requires no changes. Apply it immediately.
+
+---
+
+## What This System Is Not
+
+It is not autonomous. No skill runs without you invoking it. No skill posts to Jira or sends a Slack message, and no skill commits your vault: it prints the git lines and you run them. `/tg-dev` commits code only on a feature branch, and a hook asks you first. Every output is a draft. You send.
+
+It is not a replacement for your judgment. The skills are thinking partners. They do the work of orientation, structure, and drafting. You make the calls on scope, design, and communication.
+
+It is not a shortcut. The chain takes more steps than ad hoc Claude use, especially at the start. The payoff is consistency, accumulated knowledge, and the ability to pick up any ticket from the state file without reconstructing context from scratch.

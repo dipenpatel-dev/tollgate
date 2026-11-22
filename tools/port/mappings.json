@@ -1,0 +1,10 @@
+{
+  "paths": {
+    "/home/example/vault": "$TOLLGATE_KNOWLEDGE",
+    "/home/example/code": "$TOLLGATE_CODE_DIR",
+    "/home/example/tollgate": "$TOLLGATE_HOME"
+  },
+  "ticket_prefixes": ["ABC"],
+  "skill_prefixes": ["ex-"],
+  "initials": ["XYZ"]
+}

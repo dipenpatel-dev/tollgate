@@ -1,0 +1,49 @@
+# routing.yaml
+# Intent to collection weights for tiered retrieval over the three collections.
+#
+# equal_weights is the fallback when intent is ambiguous.
+# intents gives per-intent collection weights. The router turns them into a gentle tilt of +/-10 percent
+# on the similarity (see INTENT_TILT in config.py), so an intent never hides a collection. A weight of 0
+# switches that collection off for the intent. A collection missing from the list gets the top weight.
+# situation_map maps the situation names a command passes to an intent.
+# skill_map maps the last word of a command name (for example "dev" in "x-dev") to an intent.
+# tiers lists words that set a file's confidence tier (1 verified, 3 observed; others are 2). A word
+# matches only a whole word inside a path segment ("thread" matches "chat-thread", not "threadpool"; a
+# trailing "s" is allowed). The layout folders (conversations, chat threads, meetings, landing, the
+# decisions and patterns folders) set the tier first, before any word.
+#
+# To retune, edit the numbers here. No Python change is needed.
+
+intents:
+  teach:  {references: 1.0, vault: 0.6, tickets: 0.3, code: 0.2, standards: 0.3, knowledge: 0.6}
+  verify: {vault: 1.0, tickets: 0.8, references: 0.5, code: 0.3, standards: 0.9, knowledge: 1.0}
+  build:  {vault: 0.8, tickets: 0.7, references: 0.6, code: 0.8, standards: 0.7, knowledge: 0.8}
+  decide: {vault: 1.0, tickets: 0.9, references: 0.3, code: 0.2, standards: 0.4, knowledge: 1.0}
+  draft:  {vault: 1.0, references: 0.4, tickets: 0.3, code: 0.1, standards: 0.3, knowledge: 0.8}
+
+situation_map:
+  arch_design:    teach
+  spec_define:    verify
+  dev_implement:  build
+  qa_review:      verify
+  support_triage: decide
+
+skill_map:
+  spec:    verify
+  arch:    teach
+  dev:     build
+  qa:      verify
+  support: decide
+  ticket:  decide
+
+tiers:
+  1: [rca, decision, pattern]
+  3: [meeting, conversation, landing, slack, chat, thread]
+
+equal_weights:
+  vault:      0.34
+  knowledge:  0.34
+  tickets:    0.33
+  references: 0.33
+  code:       0.2
+  standards:  0.2

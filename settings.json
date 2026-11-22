@@ -1,0 +1,284 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/pre-submit-vault-inject.sh\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "UserPromptExpansion": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/pre-prompt-expansion-check-gates.py\"",
+            "timeout": 10,
+            "onFailure": "block"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/pre-tool-write-scan-phi.py\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/pre-tool-write-guard-path.sh\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/pre-tool-bash-scan-phi.py\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/pre-tool-bash-databricks-ask.py\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/pre-tool-bash-guard-code-dir.py\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/pre-tool-bash-guard-gate-override.py\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/pre-tool-bash-gate-pr-create.py\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/pre-tool-write-require-read.py\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/pre-tool-read-ask-sensitive-path.py\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/pre-prompt-expansion-check-gates.py\"",
+            "timeout": 10,
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/git_commit_guard.sh\"",
+            "onFailure": "block"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/git_push_guard.sh\"",
+            "onFailure": "block"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/co_authored_by_check.sh\"",
+            "onFailure": "block"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/guard_worktree_remove.sh\"",
+            "onFailure": "block"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/git_readonly_guard.sh\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/secret-command-guard.sh\"",
+            "onFailure": "block"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/scrub_secrets.py\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/scrub_secrets.py\"",
+            "onFailure": "block"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/pre_tool_write_scan_claims.py\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/pre_tool_write_vault_frontmatter.py\"",
+            "onFailure": "block"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/post-tool-bash-scan-secrets.py\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/post-tool-result-scan-phi.py\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/post-tool-read-record.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/scrub_secrets.py\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/vault_doc_standard_check.sh\""
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_DOTFILES/hooks/pre-compact-checkpoint-warn.sh\""
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "mcp__atlassian__getAccessibleAtlassianResources",
+      "mcp__atlassian__searchJiraIssuesUsingJql",
+      "mcp__atlassian__getJiraIssue",
+      "Bash(git config --get:*)",
+      "Bash(git config --get-all:*)",
+      "Bash(git config --get-regexp:*)",
+      "Bash(git config --list:*)",
+      "Bash(git config -l:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(date)",
+      "Bash(find $TOLLGATE_KNOWLEDGE/**)",
+      "Bash(find $TOLLGATE_SCRIPTS/**)",
+      "Bash($TOLLGATE_HOME/scripts/search/tg-search:*)",
+      "Bash($$TOLLGATE_HOME/scripts/search/tg-search:*)",
+      "Bash($TOLLGATE_HOME/scripts/core/tg_path:*)",
+      "Bash($TOLLGATE_HOME/scripts/core/tg_ticket_dir:*)",
+      "Read($TOLLGATE_KNOWLEDGE/**)",
+      "Read($TOLLGATE_SCRIPTS/**)",
+      "Read($CLAUDE_DOTFILES/**)"
+    ],
+    "additionalDirectories": []
+  }
+}

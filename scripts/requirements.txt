@@ -1,0 +1,11 @@
+# Libraries the scripts import beyond the standard library.
+# Add a line here only when a script really imports it.
+# Bounds: lower = the version the tests ran on, upper = the next major release.
+# chromadb is used by the search scripts (scripts/search) for the index.
+# pyyaml is used by the connector files and optional config readers.
+# beautifulsoup4 is used by the search index (epub text, only with requirements-epub.txt).
+# Optional extras: requirements-epub.txt (epub books), requirements-extras.txt (index context pass).
+# The path loader, bootstrap scripts, hooks and session_cost need nothing here.
+chromadb>=1.5.9,<2
+pyyaml>=6.0.4,<7
+beautifulsoup4>=4.15.0,<5

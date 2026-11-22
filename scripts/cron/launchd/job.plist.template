@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Tollgate scheduled job template. setup_cron.py fills each marker written between two at signs. -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>@LABEL@</string>
+
+    <key>ProgramArguments</key>
+    <array>
+@PROGRAM_ARGUMENTS@
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+@SCHEDULE@
+    </dict>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+@ENVIRONMENT@
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>@LOG_FILE@</string>
+    <key>StandardErrorPath</key>
+    <string>@LOG_FILE@</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

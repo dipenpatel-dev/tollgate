@@ -1,0 +1,287 @@
+#!/usr/bin/env python3
+"""
+module_name: chart_check
+description: Checks the Mermaid charts in documents against the chart standard.
+             Finds each chart, names its type from its first word, and reports the
+             charts that break a rule. Findings carry a chart number, a line number
+             and a reason; they never repeat text from the document.
+             Exit 0 clean, 1 findings, 2 cannot finish.
+author: Dipen Patel (dipenpatel-dev)
+date:
+version: 1.0.0
+change_log:
+  1.0.0: Initial command. Type check per role, exception lines, shape, node cap,
+         per-node style lines and host address rules.
+usage:
+  chart_check --role ROLE [--ticket KEY | --state FILE] [--require-chart] [--rules FILE] FILE...
+"""
+from __future__ import annotations
+
+import argparse
+import pathlib
+import re
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+from chart_rules import (  # noqa: E402
+    ChartRulesError, allowed_for_role, load_rules, widened_types,
+)
+
+REASON_NOT_ALLOWED = "type_not_allowed"
+REASON_UNLISTED = "type_unlisted"
+REASON_EXCEPTION_EMPTY = "exception_reason_empty"
+REASON_NO_CHART = "no_chart"
+REASON_SHAPE = "shape_not_allowed"
+REASON_NODES = "too_many_nodes"
+REASON_STYLE_LINE = "style_line_used"
+REASON_HOST = "host_address"
+
+EXCEPTION_MARKER = "%% exception:"
+COMMENT_MARKER = "%%"
+FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+FENCE_CLOSE = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*$")
+QUOTE_PREFIX = re.compile(r"^(?: {0,3}>[ \t]?)+")
+TICKET_KEY = re.compile(r"^[A-Za-z][A-Za-z0-9]*-[0-9]+$")
+QUOTED = re.compile(r'"[^"\n]*"')
+IPV4 = re.compile(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b")
+ARROW = re.compile(r"\s*(?:<?[-=.]+[->ox]?\|[^|]*\||<?[-=.]{2,}[->ox]?)\s*")
+NODE_ID = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)")
+SKIP_LINE = re.compile(r"^(subgraph|end\b|class\b|classDef\b|style\b|linkStyle\b|direction\b|click\b|flowchart|graph)")
+
+REASON_TEXT = {
+    REASON_NOT_ALLOWED: "this chart type is not allowed here",
+    REASON_UNLISTED: "the first word of this chart is not a known chart type",
+    REASON_EXCEPTION_EMPTY: "the exception line has no reason after the colon",
+    REASON_NO_CHART: "the document has no chart and one is required",
+    REASON_SHAPE: "this flowchart uses a circle, hexagon or stadium shape",
+    REASON_NODES: "this flowchart has more nodes than the limit",
+    REASON_STYLE_LINE: "this chart uses a per-node style line; use classDef instead",
+    REASON_HOST: "this chart holds a host address",
+}
+
+EXIT_OK, EXIT_FINDINGS, EXIT_CANNOT = 0, 1, 2
+
+
+def extract_charts(text: str) -> list:
+    """Return (index, line, body) for every closed mermaid fence, in order."""
+    charts = []
+    fence = None
+    open_line, quoted, body = 0, False, []
+    for number, raw in enumerate(text.replace("\r\n", "\n").split("\n"), start=1):
+        if fence is None:
+            line = QUOTE_PREFIX.sub("", raw)
+            match = FENCE_OPEN.match(line)
+            if match and not (match.group(1)[0] == "`" and "`" in match.group(2)):
+                words = match.group(2).split()
+                fence = (match.group(1)[0], len(match.group(1)), words[0].lower() if words else "")
+                open_line, quoted, body = number, line != raw, []
+            continue
+        line = QUOTE_PREFIX.sub("", raw) if quoted else raw
+        close = FENCE_CLOSE.match(line)
+        if close and close.group(1)[0] == fence[0] and len(close.group(1)) >= fence[1]:
+            if fence[2] == "mermaid":
+                charts.append((len(charts) + 1, open_line, "\n".join(body)))
+            fence = None
+        else:
+            body.append(line)
+    return charts
+
+
+def _body_lines(body: str) -> list:
+    """Chart lines without a leading front matter block."""
+    lines = body.split("\n")
+    first = next((i for i, l in enumerate(lines) if l.strip()), None)
+    if first is None or lines[first].strip() != "---":
+        return lines
+    for i in range(first + 1, len(lines)):
+        if lines[i].strip() == "---":
+            return lines[i + 1:]
+    return []
+
+
+def chart_type(body: str, rules):
+    """Slug whose keywords hold the first word of the chart, or None."""
+    for line in _body_lines(body):
+        stripped = line.strip()
+        if not stripped or stripped.startswith(COMMENT_MARKER):
+            continue
+        token = stripped.split()[0]
+        for slug, words in rules.types.items():
+            if token in words:
+                return slug
+        return None
+    return None
+
+
+def _exception_state(body: str):
+    for line in body.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith(EXCEPTION_MARKER):
+            return "ok" if stripped[len(EXCEPTION_MARKER):].strip() else "empty"
+    return None
+
+
+def _clean_lines(body: str) -> list:
+    out = []
+    for line in _body_lines(body):
+        stripped = QUOTED.sub('""', line).strip()
+        if stripped and not stripped.startswith(COMMENT_MARKER):
+            out.append(stripped)
+    return out
+
+
+def count_nodes(body: str) -> int:
+    ids = set()
+    for line in _clean_lines(body):
+        if SKIP_LINE.match(line):
+            continue
+        for piece in ARROW.split(line):
+            for part in piece.split("&"):
+                found = NODE_ID.match(part.strip())
+                if found:
+                    ids.add(found.group(1))
+    return len(ids)
+
+
+def check_charts(text: str, allowed, rules, require_chart: bool = False) -> list:
+    """Return findings as (index, line, reason, type) tuples."""
+    charts = extract_charts(text)
+    if require_chart and not charts:
+        return [(0, 0, REASON_NO_CHART, None)]
+    findings = []
+    for index, line, body in charts:
+        slug = chart_type(body, rules)
+        state = _exception_state(body)
+        if slug is None or slug not in allowed:
+            if state == "ok":
+                pass
+            elif state == "empty":
+                findings.append((index, line, REASON_EXCEPTION_EMPTY, slug))
+            else:
+                findings.append((index, line, REASON_UNLISTED if slug is None else REASON_NOT_ALLOWED, slug))
+        cleaned = _clean_lines(body)
+        if slug == "flowchart":
+            if any(shape in l for l in cleaned for shape in rules.forbidden_shapes):
+                findings.append((index, line, REASON_SHAPE, slug))
+            if count_nodes(body) > rules.max_flowchart_nodes:
+                findings.append((index, line, REASON_NODES, slug))
+            if any(l.startswith("style ") for l in cleaned):
+                findings.append((index, line, REASON_STYLE_LINE, slug))
+        if IPV4.search(body):
+            findings.append((index, line, REASON_HOST, slug))
+    return findings
+
+
+def describe(findings: list, allowed) -> str:
+    lines = [f"chart {i} (line {ln}): {REASON_TEXT[reason]}" for i, ln, reason, _t in findings]
+    lines.append("Allowed here: " + (", ".join(sorted(allowed)) or "none") + ".")
+    lines.append("To keep a chart outside this list, add a line `" + EXCEPTION_MARKER + " <reason>` inside it.")
+    return "\n".join(lines)
+
+
+def read_flags(path: pathlib.Path) -> dict:
+    """Read simple `key: value` lines from a front matter block. Only the word true or false counts."""
+    flags = {}
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return flags
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return flags
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        key, sep, value = line.partition(":")
+        if sep and key.strip():
+            word = value.split(" #")[0].strip().lower()
+            if word in ("true", "false"):
+                flags[key.strip()] = word == "true"
+    return flags
+
+
+def find_state_file(ticket: str):
+    """Locate <tickets>/<PREFIX>/<KEY>/<KEY>-state.md, or the flat form. None when absent."""
+    from core.paths import get_path, ticket_folder
+    folder = ticket_folder(ticket, get_path("tickets"))
+    if folder is None:
+        return None
+    candidate = folder / f"{ticket}-state.md"
+    return candidate if candidate.is_file() else None
+
+
+class CannotFinish(Exception):
+    def __init__(self, stage: str, error: str, note: str = ""):
+        super().__init__(stage, error)
+        self.stage, self.error, self.note = stage, error, note
+
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message):  # noqa: D401
+        raise CannotFinish("args", "ArgumentError")
+
+
+def build_parser():
+    parser = _Parser(prog="chart_check", description="Check the charts in documents.")
+    parser.add_argument("--role", required=True)
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument("--ticket")
+    source.add_argument("--state")
+    parser.add_argument("--require-chart", action="store_true")
+    parser.add_argument("--rules")
+    parser.add_argument("files", nargs="+")
+    return parser
+
+
+def run(argv) -> int:
+    args = build_parser().parse_args(argv)
+    try:
+        rules = load_rules(args.rules)
+    except ChartRulesError as exc:
+        raise CannotFinish("rules", "ChartRulesError", str(exc)) from None
+    widened = frozenset()
+    state_file = None
+    if args.state:
+        state_file = pathlib.Path(args.state)
+    elif args.ticket:
+        if not TICKET_KEY.match(args.ticket):
+            raise CannotFinish("args", "ValueError", "the ticket key is not valid")
+        try:
+            state_file = find_state_file(args.ticket)
+        except Exception as exc:  # NotSetUp or a missing loader
+            raise CannotFinish("state", type(exc).__name__, "not set up: the tickets folder cannot be found") from None
+    if state_file is not None and state_file.is_file():
+        widened = widened_types(rules, read_flags(state_file))
+    try:
+        allowed = allowed_for_role(rules, args.role, widened)
+    except ChartRulesError:
+        raise CannotFinish("args", "ChartRulesError", "unknown role: " + args.role) from None
+    status = EXIT_OK
+    for name in args.files:
+        try:
+            text = pathlib.Path(name).read_text(encoding="utf-8")
+        except Exception as exc:
+            raise CannotFinish("read", type(exc).__name__) from None
+        findings = check_charts(text, allowed, rules, args.require_chart)
+        if findings:
+            status = EXIT_FINDINGS
+            sys.stdout.write(pathlib.Path(name).name + "\n" + describe(findings, allowed) + "\n")
+    return status
+
+
+def main(argv=None) -> int:
+    try:
+        return run(argv)
+    except CannotFinish as exc:
+        sys.stderr.write(f"chart check could not finish (stage: {exc.stage}, error: {exc.error})\n")
+        if exc.note:
+            sys.stderr.write(exc.note + "\n")
+    except Exception as exc:
+        sys.stderr.write(f"chart check could not finish (stage: read, error: {type(exc).__name__})\n")
+    return EXIT_CANNOT
+
+
+if __name__ == "__main__":
+    sys.exit(main())

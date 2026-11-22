@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Author: Dipen Patel (dipenpatel-dev)
+# Date:
+# Scope: git pre-push hook. Blocks direct pushes to protected branches and runs an optional check.
+# Ticket: none (Tollgate is not Jira tracked)
+# ChangeLog:
+#   - Documented the TOLLGATE_PRE_PUSH_CMD risk (it runs as a shell command). Behavior unchanged.
+#   - Created.
+#
+# Install: copy or symlink to <repo>/.git/hooks/pre-push (or use core.hooksPath).
+# Env:
+#   TOLLGATE_PROTECTED_BRANCHES  space separated branch names (default: "main master")
+#   TOLLGATE_ALLOW_PROTECTED_PUSH  set to 1 to allow a protected push once
+#   TOLLGATE_PRE_PUSH_CMD        optional command run before every push (for example a test
+#                               or review script); a non zero exit blocks the push
+#                               RISK: the value is run as a shell command (bash -c) with your
+#                               privileges on every push. Anyone or anything that can set this
+#                               variable in the environment git runs in (a shell profile, a
+#                               direnv or .env file, a CI job setting) can run code on each push.
+#                               Set it only in places you control, point it at a script you
+#                               own, and do not take it from a repo you do not trust.
+# git passes the remote name and URL as $1 and $2, and one line per ref on stdin:
+#   <local ref> <local sha> <remote ref> <remote sha>
+
+set -uo pipefail
+
+PROTECTED="${TOLLGATE_PROTECTED_BRANCHES:-main master}"
+
+if [ "${TOLLGATE_ALLOW_PROTECTED_PUSH:-0}" != "1" ]; then
+    while read -r _local_ref _local_sha remote_ref _remote_sha; do
+        [ -z "${remote_ref:-}" ] && continue
+        branch="${remote_ref#refs/heads/}"
+        for blocked in $PROTECTED; do
+            if [ "$branch" = "$blocked" ]; then
+                echo "pre-push: direct push to '$branch' is blocked. Open a pull request instead." >&2
+                echo "pre-push: set TOLLGATE_ALLOW_PROTECTED_PUSH=1 to override once." >&2
+                exit 1
+            fi
+        done
+    done
+else
+    cat >/dev/null
+fi
+
+if [ -n "${TOLLGATE_PRE_PUSH_CMD:-}" ]; then
+    if ! bash -c "$TOLLGATE_PRE_PUSH_CMD"; then
+        echo "pre-push: TOLLGATE_PRE_PUSH_CMD failed, push blocked." >&2
+        exit 1
+    fi
+fi
+
+exit 0

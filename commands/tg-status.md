@@ -1,0 +1,118 @@
+# /tg-status - Current State Snapshot
+
+**Folders:** `{vault}`, `{tickets}` name vault folders. Look each one up when the command runs with `$TOLLGATE_HOME/scripts/core/tg_path <name>` (for example `$TOLLGATE_HOME/scripts/core/tg_path tickets`). If it prints `not set up`, stop and tell the user to run setup. `{ticket}` means the folder of one ticket: look it up when the command runs with `$TOLLGATE_HOME/scripts/core/tg_ticket_dir <KEY>` (it prints the folder, flat or under its prefix folder). If it exits 1 with `not found`, that ticket has no folder: say so and stop, unless this command's own steps create the ticket folder.
+
+**Role:** Two modes. Client mode gives current state with narrative prep for stakeholder questions. Ticket mode gives a scannable in-call reference - designed to stay open during a conversation.
+
+**Vault:** `{vault}/`
+
+---
+
+## Trigger
+`/tg-status [CLIENT|TICKET?]`
+
+- `/tg-status [CLIENT]` - client current state with three output layers
+- `/tg-status [TICKET-ID]` - ticket in-call reference, scannable only
+- `/tg-status` (no argument) - ask: "Client status or ticket reference?"
+
+Argument detection: ticket keys match `CD-\d+` or `S-\d+`. Anything else is a client name.
+
+---
+
+## CLIENT MODE - `/tg-status [CLIENT]`
+
+### Step 1 - Calculate window
+
+Run `date` to confirm today's date.
+Window: last 7 calendar days back + remaining days in the current week forward.
+State the window explicitly before reading: "Window: May 14 – May 25."
+
+### Step 2 - Read all signals
+
+**Jira** - open and recently changed tickets for this client in the window:
+- In progress, blocked, and recently closed tickets
+- Drop: backlog tickets with no activity in the window
+
+**Vault** - `{tickets}/*/` and `{tickets}/*/*/` state files for this client:
+- Status field, Next field, blockers in UNKNOWN
+- Session logs dated within the window
+
+**Slack** - client channel, last 7 days:
+- Unresolved threads with an open question or action
+- Drop: resolved threads, acknowledgment-only exchanges
+
+**Calendar** - upcoming this week:
+- Client calls scheduled - note if prep is needed
+
+### Step 3 - Synthesize: signal vs noise
+
+Signal list:
+- **In progress** - active tickets, what phase they are in
+- **Recently done** - closed in the window, one line each
+- **Blocked** - no movement, who owns the resolution
+- **Coming up** - next actions required before end of week
+
+### Step 4 - Narrative principles
+
+Apply these to shape translation and pushback layers. Same rules as `/tg-weekly`:
+- Outcome leads, mechanism follows
+- Concrete numbers, not vague summaries
+- Answer the question the reader is most likely to have, plainly and accurately
+- Say what this means for the reader, not only what happened to the system
+
+### Step 5 - Output
+
+```
+/tg-status [CLIENT] - [date range]
+
+Signal
+  [TICKET-ID]  [name]    [STATUS] - [one-line context]
+
+Say it as
+  [TICKET-ID]  [one sentence in client language - outcome, no jargon]
+
+Prepare for
+  "[Likely question]"
+    [Answer - conclusion first, concrete, no internal tooling names]
+```
+
+---
+
+## TICKET MODE - `/tg-status [TICKET]`
+
+No narrative layer. Scannable and designed to stay open on screen during a call or conversation.
+
+### Step 1 - Read
+
+Vault state file: `{ticket}/[TICKET]-state.md`
+- Status and Confirmed approach fields
+- KNOWN block: what is confirmed done
+- Next field: what is upcoming
+- UNKNOWN block: open questions that could surface mid-conversation
+- Any active blocker noted in ASSUMING or UNKNOWN
+
+### Step 2 - Output
+
+```
+/tg-status [TICKET]
+[Ticket name]                         [[STATUS]]
+
+Done
+  [item] - [brief context, one line]
+
+Next
+  [item]
+
+Blocker
+  [item - who owns the resolution, when it was flagged]
+
+Open
+  [unresolved question that could come up in conversation]
+```
+
+Rules:
+- Three lines max per section item - this is a reference, not a report
+- Blocker must name who owns the resolution
+- Open section only if there is an unresolved question that could surface mid-conversation - omit if nothing is open
+- No narrative, no translation, no pushback prep
+- If no state file exists for the ticket, say so and offer to run `/tg-ticket [TICKET]` to build it

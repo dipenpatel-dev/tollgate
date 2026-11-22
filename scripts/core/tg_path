@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""
+module_name: tg_path
+description: Print the folder for a logical name. Exit 1 with "not set up" on stderr when it cannot resolve.
+author: Dipen Patel (dipenpatel-dev)
+date:
+version: 1.0.0
+change_log:
+  1.0.0: Initial CLI for the path loader.
+"""
+import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from core.paths import NotSetUp, get_path  # noqa: E402
+
+
+def main(argv):
+    if len(argv) != 2:
+        sys.stderr.write("usage: tg_path <name>\n")
+        return 2
+    try:
+        print(get_path(argv[1]))
+    except NotSetUp as exc:
+        sys.stderr.write(str(exc) + "\n")
+        return 1
+    except KeyError:
+        sys.stderr.write("not set up: unknown name " + argv[1] + "\n")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

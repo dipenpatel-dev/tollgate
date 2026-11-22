@@ -1,0 +1,9 @@
+.claude/
+settings.local.json
+__pycache__/
+*.pyc
+.DS_Store
+
+# Personal memory never goes into the repo; only the index template is tracked.
+memory/*.md
+!memory/MEMORY.md

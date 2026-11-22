@@ -1,0 +1,366 @@
+#!/usr/bin/env python3
+# Module:      sweep
+# Description: Flush the knowledge staging folder into the vault and the search index.
+#              Each staged record (a small JSON file) becomes a vault note by type, then
+#              is added to the knowledge collection of the index. A record that was
+#              written to the vault but not indexed is kept and marked, so the next
+#              sweep retries only the index step.
+#              Without --yes it only prints what it would write and touches nothing.
+#              The index is shared state: it is opened only with --yes.
+#              Folders come from the path loader: staging is output/knowledge-staging,
+#              notes go into the vault, the index is the index path.
+# Author:      Dipen Patel (dipenpatel-dev)
+# Date:
+# Scope:       Knowledge staging to vault and index
+# Version:     1.0
+# ChangeLog:
+#   Initial version
+#   Index step uses embedder_for_index() and writes the build_index chunk fields
+#   (file, heading, source, embedding_model, truncated, origin, tags).
+"""Usage:
+    sweep [--yes] [--staging-dir DIR] [--vault DIR]
+
+Prints the plan first, then (with --yes) writes. The last line is one summary line:
+    processed=N written=N synced=N partial=N skipped=N
+Exit codes: 0 done or preview, 2 not set up.
+"""
+import argparse
+import json
+import os
+import pathlib
+import re
+import sys
+import tempfile
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from core.paths import get_path, NotSetUp, folder_name, ticket_folder  # noqa: E402
+
+
+SYSTEM_MAP_DIR = folder_name("system_map")
+REFERENCE_DIR = folder_name("reference")
+TICKETS_DIR = folder_name("tickets")
+KNOWLEDGE_DIR = folder_name("knowledge")
+EDUCATION_DIR = folder_name("education")
+CONVERSATIONS_DIR_NAME = folder_name("conversations")
+THREADS_DIR_NAME = folder_name("chat_threads")
+
+STAGING_SUBDIR = "knowledge-staging"
+COLLECTION = "knowledge"
+RECORD_TYPES = ("decision", "correction", "approval", "pattern", "repo_doc")
+SESSION_TYPES = ("interactive", "worker", "agent", "coordinator")
+VAULT_STATUSES = ("staged", "vault_written", "indexed")
+REQUIRED = ("id", "date", "ticket", "record_type", "source_repo", "source_ref", "summary", "detail")
+MAX_SUMMARY = 200
+DECISIONS_DIR = (KNOWLEDGE_DIR + "/decisions")
+PATTERNS_DIR = (KNOWLEDGE_DIR + "/patterns")
+REPOS_DIR = (SYSTEM_MAP_DIR + "/repos")
+
+
+class SweepResult:
+    def __init__(self):
+        self.processed = 0
+        self.written = 0
+        self.synced = 0
+        self.partial = 0
+        self.skipped = 0
+
+    def line(self):
+        return "processed={} written={} synced={} partial={} skipped={}".format(
+            self.processed, self.written, self.synced, self.partial, self.skipped)
+
+
+def validate(record):
+    """Raise ValueError unless the record has the required fields and sane values."""
+    missing = [f for f in REQUIRED if f not in record]
+    if missing:
+        raise ValueError("missing field(s): {}".format(missing))
+    if record["record_type"] not in RECORD_TYPES:
+        raise ValueError("bad record_type")
+    if record.get("session_type", "interactive") not in SESSION_TYPES:
+        raise ValueError("bad session_type")
+    if record.get("vault_status", "staged") not in VAULT_STATUSES:
+        raise ValueError("bad vault_status")
+    for name in ("summary", "detail"):
+        if not str(record[name]).strip():
+            raise ValueError("{} is empty".format(name))
+    if len(str(record["summary"])) > MAX_SUMMARY:
+        raise ValueError("summary is too long")
+    return record
+
+
+def read_staging(staging_dir):
+    """Return a sorted list of (record dict, path). A corrupt file is reported and skipped."""
+    found = []
+    if not staging_dir.is_dir():
+        return found
+    for path in sorted(staging_dir.glob("*.json")):
+        try:
+            found.append((validate(json.loads(path.read_text(encoding="utf-8"))), path))
+        except (OSError, ValueError, KeyError):
+            print("skipping unreadable staging file: {}".format(path.name), file=sys.stderr)
+    return found
+
+
+PATH_FIELDS = ("id", "ticket", "source_repo", "date")
+_SAFE_PART = re.compile(r"[A-Za-z0-9._-]+")
+
+
+class UnsafeRecord(ValueError):
+    """A record field that is used in a file path is not safe. The message never carries the value."""
+
+
+def check_path_fields(record):
+    """Allow only letters, digits, dot, underscore and hyphen in any field used in a path,
+    and refuse a value made only of dots."""
+    for name in PATH_FIELDS:
+        value = record.get(name)
+        if not isinstance(value, str) or not _SAFE_PART.fullmatch(value) or not value.strip("."):
+            raise UnsafeRecord("unsafe path field")
+
+
+def _inside(path, base):
+    """True when the path, with symlinks resolved, stays under the base folder."""
+    try:
+        resolved = pathlib.Path(os.path.realpath(str(path)))
+        root = pathlib.Path(os.path.realpath(str(base)))
+        resolved.relative_to(root)
+        return True
+    except (ValueError, OSError):
+        return False
+
+
+def _ticket_dir(tickets, key):
+    """The folder an approval for this ticket is written to.
+
+    An existing ticket folder (flat or under its prefix folder) is used as found. A ticket with no
+    folder yet gets `<tickets>/PREFIX/KEY`, PREFIX being the upper-case letters before the hyphen.
+    A key that is not letters, a hyphen and digits keeps the old flat `<tickets>/KEY`."""
+    found = ticket_folder(key, tickets)
+    if found is not None:
+        return found
+    match = re.match(r"^([A-Za-z]+)-[0-9]+$", key)
+    if match:
+        return tickets / match.group(1).upper() / key
+    return tickets / key
+
+
+def route(record, vault, tickets):
+    """Return the vault path a record is written to. Raise UnsafeRecord for a path that is
+    not made of safe parts or that would land outside the vault."""
+    check_path_fields(record)
+    kind = record["record_type"]
+    base = vault
+    if kind in ("decision", "correction"):
+        path = vault / DECISIONS_DIR / "{}-{}.md".format(record["date"], record["ticket"])
+    elif kind == "approval":
+        path = _ticket_dir(tickets, record["ticket"]) / "approval-{}.md".format(record["id"])
+        base = tickets
+    elif kind == "pattern":
+        path = vault / PATTERNS_DIR / "{}-{}.md".format(record["date"], record["ticket"])
+    else:
+        path = vault / REPOS_DIR / "{}.md".format(record["source_repo"])
+    if not _inside(path, base):
+        raise UnsafeRecord("path outside the vault")
+    return path
+
+
+def marker(record):
+    return "<!-- id:{} -->".format(record["id"])
+
+
+def already_in_vault(record, target):
+    if not target.exists():
+        return False
+    if record["record_type"] in ("decision", "correction", "pattern"):
+        return marker(record) in target.read_text(encoding="utf-8")
+    return True
+
+
+def atomic_write(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".sweep-")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        os.replace(tmp, str(path))
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+
+
+def write_vault_doc(record, target):
+    check_path_fields(record)
+    kind = record["record_type"]
+    if kind in ("decision", "correction", "pattern"):
+        block = (
+            "\n## {date}, {kind}, {ticket} {mark}\n"
+            "**Source:** {repo} | {ref}\n"
+            "**Summary:** {summary}\n\n{detail}\n\n---\n"
+        ).format(date=record["date"], kind=kind, ticket=record["ticket"], mark=marker(record),
+                 repo=record["source_repo"], ref=record["source_ref"],
+                 summary=record["summary"], detail=record["detail"])
+        existing = target.read_text(encoding="utf-8") if target.exists() else ""
+        atomic_write(target, existing + block)
+    elif kind == "approval":
+        atomic_write(target, (
+            "---\nid: {id}\ndoc_type: approval\nticket: {ticket}\ndate: {date}\n"
+            "source_repo: {repo}\nsource_ref: {ref}\n---\n"
+            "# Approval, {ticket} ({date})\n**Summary:** {summary}\n\n{detail}\n"
+        ).format(id=record["id"], ticket=record["ticket"], date=record["date"],
+                 repo=record["source_repo"], ref=record["source_ref"],
+                 summary=record["summary"], detail=record["detail"]))
+    elif not target.exists():
+        atomic_write(target, (
+            "---\ndoc_type: repo_doc\nsource_repo: {repo}\ncreated: {date}\n---\n# {repo}\n{detail}\n"
+        ).format(repo=record["source_repo"], date=record["date"], detail=record["detail"]))
+
+
+def mark_vault_written(record, path):
+    updated = dict(record)
+    updated["vault_status"] = "vault_written"
+    atomic_write(path, json.dumps(updated, indent=2, ensure_ascii=False))
+
+
+class ChromaIndex:
+    """The real index: the knowledge collection of the index folder. Opened only on --yes."""
+
+    def __init__(self):
+        import chromadb  # optional dependency; a missing one makes the index step fail
+        sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "search"))
+        import config as search_config
+        import embedder as search_embedder
+        self._normalize = search_config.NORMALIZE_EMBEDDINGS
+        index_dir = get_path("index")
+        index_dir.mkdir(parents=True, exist_ok=True)
+        # The model that built the index, the same choice the search tools make.
+        self._embedder = search_embedder.embedder_for_index(index_dir)
+        client = search_config.chroma_client(index_dir / COLLECTION)
+        self._collection = client.get_or_create_collection(name=COLLECTION, metadata={"hnsw:space": "cosine"})
+
+    def sync(self, record):
+        existing = self._collection.get(where={"source_ref": record["source_ref"]}).get("ids", [])
+        # Same per-chunk fields as scripts/search/build_index.py, plus the record fields.
+        heading = str(record["summary"])[:80]
+        label = re.sub(r"[^A-Za-z0-9]+", " ", str(record["source_ref"]))
+        vectors = self._embedder.encode(["{}. {}. {}".format(label, heading, record["detail"])],
+                                        normalize_embeddings=self._normalize)
+        meta = {k: record[k] for k in ("source_repo", "source_ref", "record_type", "ticket", "date", "summary")}
+        meta.update({"file": record["source_ref"], "heading": heading, "source": COLLECTION,
+                     "embedding_model": self._embedder.name, "truncated": False,
+                     "origin": "sweep", "tags": ""})
+        self._collection.upsert(
+            ids=[record["id"]], documents=[record["detail"]],
+            embeddings=[list(map(float, v)) for v in vectors], metadatas=[meta],
+        )
+        stale = [i for i in existing if i != record["id"]]
+        if stale:
+            self._collection.delete(ids=stale)
+
+
+def plan_lines(pairs, vault, tickets):
+    lines = []
+    seen = set()
+    for record, path in pairs:
+        if record["id"] in seen:
+            lines.append("skip duplicate {}".format(path.name))
+            continue
+        seen.add(record["id"])
+        try:
+            target = route(record, vault, tickets)
+        except UnsafeRecord:
+            lines.append("skip refused record {} (unsafe path field)".format(path.name))
+            continue
+        if record.get("vault_status", "staged") == "vault_written" or already_in_vault(record, target):
+            vault_part = "vault: already written"
+        else:
+            vault_part = "vault: write {}".format(_rel(target, vault))
+        lines.append("{} {} | {} | index: add to {} collection".format(
+            record["record_type"], record["id"], vault_part, COLLECTION))
+    return lines
+
+
+def _rel(path, base):
+    try:
+        return str(path.relative_to(base))
+    except ValueError:
+        return str(path)
+
+
+def run_sweep(staging_dir, vault, tickets, index_factory):
+    """Write every staged record to the vault and the index. index_factory() returns an object
+    with sync(record). It is called once, and only here (never in a preview)."""
+    result = SweepResult()
+    pairs = read_staging(staging_dir)
+    index = None
+    index_error = False
+    seen = set()
+    refused = 0
+    for record, path in pairs:
+        if record["id"] in seen:
+            path.unlink()
+            result.skipped += 1
+            continue
+        seen.add(record["id"])
+        try:
+            target = route(record, vault, tickets)
+        except UnsafeRecord:
+            result.skipped += 1
+            refused += 1
+            continue
+        if record.get("vault_status", "staged") != "vault_written" and not already_in_vault(record, target):
+            write_vault_doc(record, target)
+            result.written += 1
+        try:
+            if index is None and not index_error:
+                index = index_factory()
+            if index is None:
+                raise RuntimeError("index not available")
+            index.sync(record)
+            path.unlink()
+            result.synced += 1
+        except Exception as exc:  # the vault copy is safe; keep the staging file for a retry
+            index_error = index is None
+            mark_vault_written(record, path)
+            print("index step failed for {} ({})".format(record["id"], type(exc).__name__), file=sys.stderr)
+            result.partial += 1
+        result.processed += 1
+    if refused:
+        print("refused {} record(s) with an unsafe path field; nothing written for them".format(refused),
+              file=sys.stderr)
+    return result
+
+
+def main(argv=None, index_factory=None):
+    parser = argparse.ArgumentParser(description="Flush knowledge staging to the vault and the index.")
+    parser.add_argument("--yes", action="store_true", help="Write. Without it only the plan is printed.")
+    parser.add_argument("--staging-dir", type=pathlib.Path, default=None)
+    parser.add_argument("--vault", type=pathlib.Path, default=None)
+    args = parser.parse_args(argv)
+    try:
+        vault = args.vault if args.vault else get_path("vault")
+        tickets = get_path("tickets") if not args.vault else args.vault / TICKETS_DIR
+        staging = args.staging_dir if args.staging_dir else get_path("output") / STAGING_SUBDIR
+    except NotSetUp:
+        print("not set up", file=sys.stderr)
+        return 2
+    pairs = read_staging(staging)
+    if not pairs:
+        print("nothing staged")
+        print(SweepResult().line())
+        return 0
+    for line in plan_lines(pairs, vault, tickets):
+        print("plan: " + line)
+    if not args.yes:
+        print("preview only: nothing written, index not opened. Run again with --yes to write.")
+        result = SweepResult()
+        result.processed = len({r["id"] for r, _ in pairs})
+        print("processed={} written=0 synced=0 partial=0 skipped=0".format(result.processed))
+        return 0
+    result = run_sweep(staging, vault, tickets, index_factory or ChromaIndex)
+    print(result.line())
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

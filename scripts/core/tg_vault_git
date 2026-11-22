@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+"""
+module_name: tg_vault_git
+description: Print how the vault is saved (none, local or remote). Exit 1 with "not set up" on stderr when it cannot be found.
+author: Dipen Patel (dipenpatel-dev)
+date:
+version: 1.0.0
+change_log:
+  1.0.0: Initial CLI for the vault git setting.
+"""
+import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from core.paths import NotSetUp, vault_git_mode  # noqa: E402
+
+
+def main(argv):
+    if len(argv) != 1:
+        sys.stderr.write("usage: tg_vault_git\n")
+        return 2
+    try:
+        print(vault_git_mode())
+    except NotSetUp as exc:
+        sys.stderr.write(str(exc) + "\n")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

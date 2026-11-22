@@ -1,0 +1,50 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Check out repository
+        # Pinned to a commit. Bump with the weekly Dependabot pull request.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Hook shell tests
+        run: bash tests/hooks/run.sh
+
+      - name: Hook inventory check
+        run: python3 tests/hooks/check_hook_inventory.py
+
+      - name: Python unit tests
+        run: python3 -m unittest discover -s tests/hooks -p 'test_*.py'
+
+      - name: Installer tests
+        run: bash tests/installer/run.sh
+
+      - name: Leak scanner tests
+        run: bash tests/leak/run.sh
+
+      - name: Leak scan of the repo
+        run: bash tests/leak/run.sh scan .
+
+      - name: Command file tests
+        run: bash tests/commands/run.sh
+
+      - name: Harness tests
+        run: bash tests/harness/run.sh

@@ -1,0 +1,5 @@
+# Optional: only for the index context pass (scripts/search/context_generator.py).
+# Install only if you turn that pass on:
+#   <venv>/bin/pip install -r scripts/requirements-extras.txt
+anthropic>=2.12.0,<3
+aiohttp>=3.14.5,<4

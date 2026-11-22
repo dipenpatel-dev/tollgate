@@ -1,0 +1,185 @@
+{
+  "_note": "Chart type rules. A role may use only the types listed. Keywords are the first word of a chart. Edit this file to change a verdict; no code change needed.",
+  "types": {
+    "flowchart": {
+      "keywords": [
+        "flowchart",
+        "graph",
+        "flowchart-elk"
+      ],
+      "question": "How does a process or data move?"
+    },
+    "sequence": {
+      "keywords": [
+        "sequenceDiagram"
+      ],
+      "question": "Who sends what to whom, in order?"
+    },
+    "class": {
+      "keywords": [
+        "classDiagram"
+      ],
+      "question": "What is it made of?"
+    },
+    "state": {
+      "keywords": [
+        "stateDiagram-v2",
+        "stateDiagram"
+      ],
+      "question": "What states can it be in, and what moves it between them?"
+    },
+    "er": {
+      "keywords": [
+        "erDiagram"
+      ],
+      "question": "How do the tables relate?"
+    },
+    "git_graph": {
+      "keywords": [
+        "gitGraph",
+        "gitGraph:"
+      ],
+      "question": "How did branches split and merge?"
+    },
+    "requirement": {
+      "keywords": [
+        "requirementDiagram"
+      ],
+      "question": "What must hold, and what proves it?"
+    },
+    "architecture": {
+      "keywords": [
+        "architecture-beta"
+      ],
+      "question": "Where do the services and stores run?"
+    },
+    "folder_tree": {
+      "keywords": [
+        "treeView-beta"
+      ],
+      "question": "How are the files laid out?"
+    }
+  },
+  "roles": {
+    "idea-analyst": [
+      "flowchart"
+    ],
+    "spec-writer": [
+      "requirement",
+      "flowchart"
+    ],
+    "market-researcher": [],
+    "solution-architect": [
+      "flowchart",
+      "class",
+      "sequence",
+      "state"
+    ],
+    "design-reviewer": [],
+    "software-engineer": [
+      "class",
+      "sequence",
+      "state",
+      "flowchart",
+      "folder_tree"
+    ],
+    "test-engineer": [
+      "flowchart"
+    ],
+    "integration-engineer": [
+      "git_graph",
+      "flowchart"
+    ],
+    "edge-case-validator": [
+      "flowchart",
+      "state"
+    ],
+    "build-explainer": [
+      "sequence",
+      "class",
+      "flowchart"
+    ],
+    "code-reviewer": [],
+    "qa-engineer": [
+      "requirement",
+      "sequence"
+    ],
+    "gate-auditor": [
+      "requirement",
+      "flowchart"
+    ],
+    "deployment-engineer": [
+      "sequence",
+      "flowchart",
+      "architecture"
+    ],
+    "automation-engineer": [
+      "flowchart",
+      "state"
+    ],
+    "infrastructure-engineer": [
+      "architecture",
+      "flowchart"
+    ],
+    "reliability-engineer": [
+      "flowchart",
+      "state",
+      "sequence"
+    ],
+    "document-writer": [
+      "class",
+      "sequence",
+      "flowchart"
+    ],
+    "knowledge-archivist": [
+      "flowchart"
+    ],
+    "vault-curator": [
+      "folder_tree"
+    ],
+    "diagram-analyst": [
+      "flowchart",
+      "sequence",
+      "class",
+      "state",
+      "er",
+      "git_graph",
+      "requirement",
+      "architecture",
+      "folder_tree"
+    ],
+    "compliance-auditor": [
+      "flowchart"
+    ],
+    "vulnerability-reviewer": [
+      "flowchart",
+      "sequence"
+    ],
+    "perimeter-engineer": [
+      "architecture",
+      "flowchart"
+    ],
+    "intelligence-analyst": [
+      "flowchart"
+    ],
+    "document-specialist": [
+      "flowchart"
+    ],
+    "message-writer": [],
+    "slide-writer": [
+      "flowchart"
+    ],
+    "meeting-planner": []
+  },
+  "ticket_widen": {
+    "touches_data_model": [
+      "er"
+    ]
+  },
+  "max_flowchart_nodes": 12,
+  "forbidden_flowchart_shapes": [
+    "((",
+    "{{",
+    "(["
+  ]
+}
