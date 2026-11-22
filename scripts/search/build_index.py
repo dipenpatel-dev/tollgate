@@ -13,6 +13,9 @@ change_log:
   1.2.0: The vault walk skips the top-level archive, work, history, landing and output folders (by path, from the
          layout). Files that are links pointing outside their source folder are skipped. Stale entries are
          removed per collection, so one unreadable file no longer leaves ghost entries.
+  1.3.0: TG-1. A file in the references folder that reference_add.py added with tags is skipped by the build,
+         and its untagged build chunks are removed, so a passage is never stored twice. Edits to such a file
+         reach the index when it is added again. reference_key() gives the key both scripts use for it.
 usage: python3 build_index.py [--full] [--source vault|tickets|references|code|standards] [--embedder hash|local|auto] [--context]
   --full      Re-embed everything (drops build chunks, keeps chunks added with reference_add.py)
   --source    Limit to one collection (default: all)
@@ -305,6 +308,24 @@ def real_inside(path: pathlib.Path, root: pathlib.Path) -> bool:
         return False
 
 
+def reference_key(path: pathlib.Path) -> str | None:
+    """The key the build uses for a file inside the references folder, or None when it is not inside.
+
+    reference_add.py uses this key for such a file, so the build and the add agree on one name for it.
+    """
+    for collection, root, prefix in source_roots():
+        if collection != "references" or not real_inside(path, root):
+            continue
+        for base in (root, root.resolve()):
+            for candidate in (path.absolute(), path.resolve()):
+                try:
+                    rel = candidate.relative_to(base).as_posix()
+                except ValueError:
+                    continue
+                return f"{prefix}/{rel}" if prefix else rel
+    return None
+
+
 def find_source_files(only: str | None = None, errors: dict | None = None) -> list[tuple[pathlib.Path, str, str]]:
     """Every file to index as (path, key, collection).
 
@@ -459,12 +480,23 @@ def build(only: str | None = None, full: bool = False, embedder_name: str | None
     if not only or embedder_mod.read_marker(root) is None:
         embedder_mod.write_marker(root, emb)
 
+    # Files added with tags (origin add) belong to reference_add.py. The build leaves them alone.
+    added_keys: set[str] = set()
+    if "references" in registry:
+        got = registry["references"][0].get(where={"origin": "add"}, include=["metadatas"])
+        added_keys = {m["file"] for m in got["metadatas"]}
+
     walk_errors: dict[str, int] = {}
     files = find_source_files(only, walk_errors)
     records, skipped, errors = [], 0, sum(walk_errors.values())
     epub_warned = False
     for fpath, key, collection in files:
         if collection not in registry:
+            continue
+        if collection == "references" and key in added_keys:
+            _delete_file(registry[collection][0], key)
+            registry[collection][1].pop(key, None)
+            skipped += 1
             continue
         mtime = str(fpath.stat().st_mtime)
         if not full and registry[collection][1].get(key) == mtime:

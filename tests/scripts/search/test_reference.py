@@ -112,6 +112,57 @@ class ReferenceStore(unittest.TestCase):
             build_index.build(full=True, embedder_name="hash")
             self.assertEqual(refstore.open_references().count(), before)
 
+    def library_chunks(self, name_part):
+        """Metadata of every references chunk whose file key holds name_part, read in the throwaway home."""
+        import refstore
+        with in_env(self.env):
+            metas = refstore.open_references().get(include=["metadatas"])["metadatas"]
+        return [m for m in metas if name_part in m["file"]]
+
+    def make_library(self):
+        lib = pathlib.Path(self.home) / "vault" / "references"
+        write(lib / "design" / "seams.md", DESIGN_DOC)
+        write(lib / "plain.md", SECURITY_DOC)
+        return lib
+
+    def test_rebuild_does_not_duplicate_a_file_added_with_tags(self):
+        # TG-1: a file in the library folder is read by the rebuild (no tags) and by the add (tags).
+        # Only the tagged copy may stay.
+        import build_index
+        lib = self.make_library()
+        self.assertEqual(run_script("reference_add.py", [str(lib / "design"), "--tag", "design"], self.env).returncode, 0)
+        with in_env(self.env):
+            build_index.build(embedder_name="hash")
+            build_index.build(full=True, embedder_name="hash")
+        seams = self.library_chunks("seams.md")
+        self.assertTrue(seams)
+        self.assertEqual({m["origin"] for m in seams}, {"add"})
+        self.assertEqual({m["tags"] for m in seams}, {"|design|"})
+        plain = self.library_chunks("plain.md")  # never added: the rebuild still indexes it, untagged
+        self.assertTrue(plain)
+        self.assertEqual({m["origin"] for m in plain}, {"build"})
+
+    def test_add_after_rebuild_replaces_the_untagged_copy(self):
+        import build_index
+        lib = self.make_library()
+        with in_env(self.env):
+            build_index.build(embedder_name="hash")
+        self.assertEqual({m["origin"] for m in self.library_chunks("seams.md")}, {"build"})
+        self.assertEqual(run_script("reference_add.py", [str(lib / "design"), "--tag", "design"], self.env).returncode, 0)
+        seams = self.library_chunks("seams.md")
+        self.assertEqual({m["origin"] for m in seams}, {"add"})
+        self.assertEqual(len(seams), 1)
+
+    def test_tag_filter_finds_a_library_file_once(self):
+        lib = self.make_library()
+        run_script("reference_add.py", [str(lib), "--tag", "design"], self.env)
+        write(pathlib.Path(self.home) / ".tollgate" / "references.yaml", "arch_design: [design]\n")
+        import build_index
+        with in_env(self.env):
+            build_index.build(embedder_name="hash")
+        out = self.query("--query", "place to change behavior without editing code", "--situation", "arch_design", "--top", "5")
+        self.assertEqual(out.stdout.count("seams.md"), 1, out.stdout)
+
     def test_no_network_in_add_and_query(self):
         from connector_helpers import assert_no_network
         import reference_add

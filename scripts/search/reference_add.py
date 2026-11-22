@@ -8,6 +8,8 @@ version: 1.0.0
 change_log:
   1.0.0: Initial version. Local only, no network.
   1.1.0: Inside a folder, files that are links pointing outside it are skipped. A single file named on the command line is taken as given.
+  1.2.0: TG-1. A file inside the references folder gets the same key the rebuild uses (build_index.reference_key),
+         and its untagged build chunks are removed when it is added, so a passage is never stored twice.
 usage: python3 reference_add.py PATH [--tag design --tag security] [--embedder hash|local]
   PATH     a file, or a folder (searched for .md .txt .rst .epub files)
   --tag    a label you choose; repeat for several. Chunks carry the tags. reference_query.py filters on them.
@@ -31,7 +33,7 @@ def collect(target: pathlib.Path) -> list[tuple[pathlib.Path, str]]:
     """Return (file, key) pairs. Keys start with the folder (or file) name so two sources do not collide."""
     exts = build_index.EXTENSIONS["references"]
     if target.is_file():
-        return [(target, target.name)] if target.suffix.lower() in exts else []
+        return [(target, build_index.reference_key(target) or target.name)] if target.suffix.lower() in exts else []
     out = []
     skip = config.skip_dirs()
     for path in sorted(target.rglob("*")):
@@ -42,7 +44,7 @@ def collect(target: pathlib.Path) -> list[tuple[pathlib.Path, str]]:
             continue
         if path.is_symlink() and not build_index.real_inside(path, target):
             continue
-        out.append((path, f"{target.name}/{'/'.join(rel_parts)}"))
+        out.append((path, build_index.reference_key(path) or f"{target.name}/{'/'.join(rel_parts)}"))
     return out
 
 
@@ -63,6 +65,8 @@ def add(target: pathlib.Path, tags: list[str], emb=None) -> dict:
         if chunks:
             records.append(build_index.FileRecord(fpath, key, "references", str(fpath.stat().st_mtime), text, chunks))
     meta_tags = refstore.tags_to_meta(tags)
+    for rec in records:
+        build_index._delete_file(col, rec.file_key)  # the untagged copy the rebuild made, if any
     added = build_index.embed_records(records, col, emb, state, state_file, origin="add", tags=meta_tags)
     return {"files": len(records), "chunks": added, "errors": errors, "tags": refstore.meta_to_tags(meta_tags)}
 
