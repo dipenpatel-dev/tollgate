@@ -27,6 +27,7 @@ One entry per documented source file (page path under `docs/` mirrors the source
 - [commands/tg-pr-review.md](commands/pr-review.md) - Reads someone else's pull request, writes a brief, and drafts up to three comments. It posts nothing: you decide what to post .
 - [commands/tg-pull-notes.md](commands/pull-notes.md) - It copies new exported meeting notes from a folder you name into the local meetings folder. Use it after you export notes from your meeting tool.
 - [commands/tg-qa.md](commands/qa.md) - Reviews the whole merged change as an adversary, runs the validation scenarios, and ends with a verdict and a routing slip. It never fixes anything .
+- [commands/tg-reference-import.md](commands/reference-import.md) - Copies reference material into your library, writes its README and index, maps it to situations, and adds it to the search with your tags.
 - [commands/tg-retrieve.md](commands/retrieve.md) - Looks up passages from the search index and hands them to the conversation as context .
 - [commands/tg-save.md](commands/save.md) - It writes a quick checkpoint of the session to the session log so any AI, or the next session, can pick the work up if things crash or context runs
 - [commands/tg-spec.md](commands/spec.md) - It turns a ticket into a written, owner-approved spec: what to build and how to prove it works. Use it first, before any design. It does not desig

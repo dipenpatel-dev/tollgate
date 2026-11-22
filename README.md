@@ -124,7 +124,7 @@ These hooks are guardrails for a cooperative model, not a sandbox. Approvals are
 ## Quick start
 
 1. Collect your tokens: see [Prerequisites](docs/prerequisites.md).
-2. Clone the repo and run `./install.sh`. It sets up your identity, vault, symlinks, MCP servers and search index. Tokens go to the OS credential store. On Linux without `secret-tool` the installer stores nothing and tells you to install `libsecret-tools`. It also asks how the vault is saved (`vault_git`: `none`, `local` or `remote`; see [Setup](docs/setup.md)), and installs 28 commands (`commands/tg-*.md`).
+2. Clone the repo and run `./install.sh`. It sets up your identity, vault, symlinks, MCP servers and search index. Tokens go to the OS credential store. On Linux without `secret-tool` the installer stores nothing and tells you to install `libsecret-tools`. It also asks how the vault is saved (`vault_git`: `none`, `local` or `remote`; see [Setup](docs/setup.md)), and installs 29 commands (`commands/tg-*.md`).
 3. Reload your shell, open VSCode and run `/tg-start`.
 
 Details: [Setup](docs/setup.md). Python 3.12 or later; the check is `python3 --version`.

@@ -2,7 +2,7 @@
 
 Created by Dipen Patel.
 
-> Every Tollgate command starts with `tg-`, for example `/tg-ticket`, `/tg-start` and `/tg-close`. The name is fixed: there is no prefix to choose at install time. There are 28 commands in `commands/`, one file each. {src:install.sh:1145-1148}
+> Every Tollgate command starts with `tg-`, for example `/tg-ticket`, `/tg-start` and `/tg-close`. The name is fixed: there is no prefix to choose at install time. There are 29 commands in `commands/`, one file each. {src:install.sh:1145-1148}
 
 ---
 

@@ -250,7 +250,7 @@ Here is the complete picture with `dipen` as the base and `tollgate` as the stem
 ~/Developer/dipen/
 │
 ├── tollgate-dotfiles/               git tracked
-│   ├── commands/                    the 28 commands, shipped as tg-*.md
+│   ├── commands/                    the 29 commands, shipped as tg-*.md
 │   ├── hooks/                       Claude Code hooks and git hooks
 │   ├── scripts/                     path loader, search, sync, connectors, cron
 │   ├── installer/                   settings merge and manifest tools
@@ -352,7 +352,7 @@ And what Claude Code reads at runtime:
     ├── tg-start.md                  /tg-start
     ├── tg-close.md                  /tg-close
     ├── tg-draft.md                  /tg-draft
-    └── ...                          28 tg-*.md files in all
+    └── ...                          29 tg-*.md files in all
 ```
 
 ---

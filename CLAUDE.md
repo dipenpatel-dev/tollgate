@@ -320,6 +320,7 @@ Before writing or changing code, read `$CLAUDE_DOTFILES/standards/coding-standar
 | `/tg-sync` | 10-minute fact hygiene: reads active ticket state files, surfaces blockers and pending decisions |
 | `/tg-draft` | Draft any communication going to another person |
 | `/tg-pull-notes [meeting]` | Pull meeting transcript into the vault for context |
+| `/tg-reference-import [path] [tags]` | Add reference material (documents, notes, standards) to the library and the search, with README, index and situation tags |
 
 **Slack:** Use MCP Slack tools directly for live search. Read only. Never push or post to Slack via MCP.
 
