@@ -2,9 +2,11 @@
 
 **A governed harness for Claude Code. Claude proposes, you approve.**
 
-Context engineering, structured skills and PHI safeguards take each ticket from specification to review, with human approval at every checkpoint.
+Context engineering, structured skills and safeguards for sensitive data take each ticket from specification to review, with human approval at every checkpoint.
 
 Created by Dipen Patel.
+
+Claude Code is fast, but it forgets between sessions, skips steps, and can touch things it should not. Tollgate adds three things: your notes are searched and injected into every prompt, each ticket moves through spec, design, build and QA with an approval at each step, and hooks check every tool call before it runs. If a hook cannot start, the action is blocked on Claude Code 2.1.295 or newer.
 
 ## Why it exists
 
@@ -15,6 +17,14 @@ An AI assistant doing real data work fails in three predictable ways. Tollgate c
 | It forgets between sessions | **Context engineering.** Every prompt is searched against your notes vault and relevant excerpts are injected. Standards, memory and per ticket state files load automatically. |
 | It skips steps | **A skill chain with gates.** Spec, architecture, build and QA are separate roles with defined handoffs. Hooks refuse to start a later step until the earlier one is approved. |
 | It sees or writes what it should not | **Guardrail hooks.** PHI, credentials, sensitive paths, writes into the read-only code folder (`TOLLGATE_CODE_DIR`) and Databricks row queries are checked before and after each tool call. |
+
+### What you can verify
+
+1. Guards run before the action: 25 hook scripts cover credentials, sensitive paths, commits and pushes. 534 hook unit tests, 23 shell tests and 164 installer tests pass.
+2. Work survives the session: ticket state lives in the vault. Connectors cover Jira, Plane, Slack, Notion and calendar.
+3. It states its limits: these are guardrails for a cooperative model, not a sandbox. See [Safeguards and their limits](#safeguards-and-their-limits).
+
+**Not for:** Windows without WSL, Claude Code older than 2.1.295, or anyone who needs a sandbox.
 
 What happens on every prompt:
 
