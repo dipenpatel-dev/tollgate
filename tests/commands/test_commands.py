@@ -30,9 +30,9 @@ WAVE2 = [
 ALL_COMMANDS = [
     "tg-arch", "tg-close", "tg-dev", "tg-devops", "tg-doc-gen", "tg-draft", "tg-explain",
     "tg-explore", "tg-handoff", "tg-influence", "tg-learn", "tg-pr-review", "tg-pull-notes",
-    "tg-qa", "tg-retrieve", "tg-save", "tg-spec", "tg-sre", "tg-start", "tg-status",
-    "tg-support", "tg-sweep", "tg-sync", "tg-terraform", "tg-think-calibrate", "tg-ticket",
-    "tg-weekly", "tg-whiteboard",
+    "tg-qa", "tg-reference-import", "tg-retrieve", "tg-save", "tg-spec", "tg-sre", "tg-start",
+    "tg-status", "tg-support", "tg-sweep", "tg-sync", "tg-terraform", "tg-think-calibrate",
+    "tg-ticket", "tg-weekly", "tg-whiteboard",
 ]
 
 # Commands outside the main list that are allowed to fail CMD-01 to CMD-03.
@@ -366,7 +366,7 @@ class TestFixedPrefix(unittest.TestCase):
     """Every command carries the fixed `tg-` prefix. No per-install placeholder is left."""
 
     def test_exactly_the_shipped_commands(self):
-        self.assertEqual(len(ALL_COMMANDS), 28)
+        self.assertEqual(len(ALL_COMMANDS), 29)
         self.assertEqual(command_files(), sorted(ALL_COMMANDS))
 
     def test_no_prefix_placeholder_left(self):
